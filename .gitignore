@@ -1,0 +1,23 @@
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# IDE и редакторы
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Логи и временные файлы
+*.log
+debug.log
+error.log
+
+# Node.js (если когда-нибудь добавите сборку)
+node_modules/
+package-lock.json
+package.json
+
+# ZIP архивы
+*.zip
