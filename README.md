@@ -1,9 +1,8 @@
 # Content Cleaner (Stopword Drafts)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/elizarov-n906/content-cleaner/main/assets/banner-1544x500.png" alt="Content Cleaner — автоматический перенос записей в черновики по стоп-словам" width="100%" style="max-width: 100%;">
+  <img src="assets/banner-1544x500.png" alt="Content Cleaner — автоматический перенос записей в черновики по стоп-словам" width="100%" style="max-width: 100%;">
 </p>
-
 <div align="center">
 
 ## Автоматическая модерация контента в WordPress
