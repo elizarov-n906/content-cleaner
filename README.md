@@ -10,8 +10,8 @@
 **Content Cleaner** — легкий плагин, который автоматически переводит записи в статус "Черновик", если в их заголовке или тексте обнаружены заданные стоп-слова. Идеально для фильтрации нежелательного контента или AI-генерации.
 
 ![Version](https://img.shields.io/badge/version-3.0.0-blue?style=flat-square)
-![WordPress](https://img.shields.io/badge/WordPress-5.8%2B-21759b?style=flat-square&logo=wordpress)
-![PHP](https://img.shields.io/badge/PHP-7.4%2B-777bb4?style=flat-square&logo=php)
+![WordPress](https://img.shields.io/badge/WordPress-7.1%2B-21759b?style=flat-square&logo=wordpress)
+![PHP](https://img.shields.io/badge/PHP-8.1%2B-777bb4?style=flat-square&logo=php)
 ![License](https://img.shields.io/badge/license-GPLv2-green?style=flat-square)
 
 [Описание](#о-плагине) · [Установка](#установка) · [Использование](#использование) · [Лицензия](#лицензия)
