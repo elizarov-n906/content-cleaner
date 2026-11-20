@@ -3,7 +3,7 @@
  * Plugin Name: Content Cleaner (Stopword Drafts)
  * Plugin URI: https://github.com/elizarov-n906/content-cleaner
  * Description: Переносит записи в черновики, если в заголовке или тексте есть стоп-слова. Настройка через админку.
- * Version: 3.0.0
+ * Version: 4.0.0
  * Author: Elizarov_n906
  * Author URI: https://github.com/elizarov-n906
  * License: GPLv2 or later
@@ -37,12 +37,13 @@ class Content_Cleaner_Stopwords {
     }
 
     public function register_settings() {
-        register_setting( 'content_cleaner_group', 'content_cleaner_list', [ 'sanitize_callback' => 'sanitize_textarea_field' ] );
-        register_setting( 'content_cleaner_group', 'content_cleaner_location', [ 'sanitize_callback' => 'sanitize_text_field' ] );
+        register_setting( 'content_cleaner_group', 'content_cleaner_list_title', [ 'sanitize_callback' => 'sanitize_textarea_field' ] );
+        register_setting( 'content_cleaner_group', 'content_cleaner_list_content', [ 'sanitize_callback' => 'sanitize_textarea_field' ] );
+        register_setting( 'content_cleaner_group', 'content_cleaner_location_title', [ 'sanitize_callback' => 'sanitize_text_field' ] );
     }
 
-    private function get_stop_words() {
-        $list = get_option( 'content_cleaner_list', '' );
+    private function get_stop_words_title() {
+        $list = get_option( 'content_cleaner_list_title', '' );
         if ( empty( $list ) ) return [];
         
         $words = preg_split( '/\r\n|\r|\n/', $list );
@@ -50,9 +51,18 @@ class Content_Cleaner_Stopwords {
         return array_filter( $words );
     }
 
-    private function get_search_location() {
-        $location = get_option( 'content_cleaner_location', 'title' );
-        if ( ! in_array( $location, [ 'title', 'content', 'both' ], true ) ) {
+    private function get_stop_words_content() {
+        $list = get_option( 'content_cleaner_list_content', '' );
+        if ( empty( $list ) ) return [];
+        
+        $words = preg_split( '/\r\n|\r|\n/', $list );
+        $words = array_map( 'trim', $words );
+        return array_filter( $words );
+    }
+
+    private function get_search_location_title() {
+        $location = get_option( 'content_cleaner_location_title', 'title' );
+        if ( ! in_array( $location, [ 'title', 'both' ], true ) ) {
             $location = 'title';
         }
         return $location;
@@ -64,11 +74,13 @@ class Content_Cleaner_Stopwords {
         if ( $post->post_status === 'draft' ) return;
         if ( ! current_user_can( 'edit_post', $post_id ) ) return;
 
-        $stop_words = $this->get_stop_words();
-        if ( empty( $stop_words ) ) return;
+        $stop_words_title = $this->get_stop_words_title();
+        $stop_words_content = $this->get_stop_words_content();
+        
+        if ( empty( $stop_words_title ) && empty( $stop_words_content ) ) return;
 
-        $location = $this->get_search_location();
-        $found_word = $this->find_stop_word( $post->post_title, $post->post_content, $stop_words, $location );
+        $location_title = $this->get_search_location_title();
+        $found_word = $this->find_stop_word( $post->post_title, $post->post_content, $stop_words_title, $stop_words_content, $location_title );
         
         if ( $found_word ) {
             remove_action( 'save_post', [ $this, 'check_and_draft_on_save' ], 20 );
@@ -85,21 +97,33 @@ class Content_Cleaner_Stopwords {
         }
     }
 
-    private function find_stop_word( $title, $content, $words, $location = 'title' ) {
+    private function find_stop_word( $title, $content, $words_title, $words_content, $location_title = 'title' ) {
         $title_l   = mb_strtolower( $title );
         $content_l = mb_strtolower( wp_strip_all_tags( $content ) );
 
-        foreach ( $words as $word ) {
+        // Проверяем стоп-слова для заголовка
+        foreach ( $words_title as $word ) {
             $word_l = mb_strtolower( trim( $word ) );
             if ( empty( $word_l ) ) continue;
 
-            $found_in_title   = ( $location === 'title' || $location === 'both' ) && mb_strpos( $title_l, $word_l ) !== false;
-            $found_in_content = ( $location === 'content' || $location === 'both' ) && mb_strpos( $content_l, $word_l ) !== false;
+            $found_in_title = ( $location_title === 'title' || $location_title === 'both' ) && mb_strpos( $title_l, $word_l ) !== false;
+            $found_in_content = ( $location_title === 'both' ) && mb_strpos( $content_l, $word_l ) !== false;
 
             if ( $found_in_title || $found_in_content ) {
                 return $word;
             }
         }
+
+        // Проверяем стоп-слова для текста
+        foreach ( $words_content as $word ) {
+            $word_l = mb_strtolower( trim( $word ) );
+            if ( empty( $word_l ) ) continue;
+
+            if ( mb_strpos( $content_l, $word_l ) !== false ) {
+                return $word;
+            }
+        }
+
         return false;
     }
 
@@ -112,12 +136,12 @@ class Content_Cleaner_Stopwords {
         // КРИТИЧЕСКИ ВАЖНО: Проверка nonce для защиты от CSRF-атак
         check_admin_referer( 'content_cleaner_cleanup_action' );
 
-        $stop_words = $this->get_stop_words();
-        $location = $this->get_search_location();
+        $stop_words_title = $this->get_stop_words_title();
+        $stop_words_content = $this->get_stop_words_content();
+        $location_title = $this->get_search_location_title();
         
         $location_labels = [
             'title'   => esc_html__( 'Только в заголовке', 'content-cleaner' ),
-            'content' => esc_html__( 'Только в тексте', 'content-cleaner' ),
             'both'    => esc_html__( 'В заголовке и тексте', 'content-cleaner' ),
         ];
         
@@ -136,7 +160,7 @@ class Content_Cleaner_Stopwords {
             $post = get_post( $post_id );
             $checked_count++;
             
-            $found_word = $this->find_stop_word( $post->post_title, $post->post_content, $stop_words, $location );
+            $found_word = $this->find_stop_word( $post->post_title, $post->post_content, $stop_words_title, $stop_words_content, $location_title );
             
             if ( $found_word ) {
                 wp_update_post( [
@@ -156,9 +180,15 @@ class Content_Cleaner_Stopwords {
         }
 
         $report = "<h1>" . esc_html__( 'Детальный отчет', 'content-cleaner' ) . "</h1>";
-        $report .= "<p><strong>" . esc_html__( 'Место поиска:', 'content-cleaner' ) . "</strong> " . esc_html( $location_labels[$location] ) . "</p>";
-        $report .= "<p><strong>" . esc_html__( 'Загружено стоп-слов:', 'content-cleaner' ) . "</strong> " . count( $stop_words ) . "</p>";
-        $report .= "<p><strong>" . esc_html__( 'Список слов:', 'content-cleaner' ) . "</strong></p><pre>" . esc_html( print_r( $stop_words, true ) ) . "</pre>";
+        $report .= "<p><strong>" . esc_html__( 'Стоп-слова для заголовка (место поиска):', 'content-cleaner' ) . "</strong> " . esc_html( $location_labels[$location_title] ) . "</p>";
+        $report .= "<p><strong>" . esc_html__( 'Загружено стоп-слов для заголовка:', 'content-cleaner' ) . "</strong> " . count( $stop_words_title ) . "</p>";
+        if ( ! empty( $stop_words_title ) ) {
+            $report .= "<p><strong>" . esc_html__( 'Список слов для заголовка:', 'content-cleaner' ) . "</strong></p><pre>" . esc_html( print_r( $stop_words_title, true ) ) . "</pre>";
+        }
+        $report .= "<p><strong>" . esc_html__( 'Загружено стоп-слов для текста:', 'content-cleaner' ) . "</strong> " . count( $stop_words_content ) . "</p>";
+        if ( ! empty( $stop_words_content ) ) {
+            $report .= "<p><strong>" . esc_html__( 'Список слов для текста:', 'content-cleaner' ) . "</strong></p><pre>" . esc_html( print_r( $stop_words_content, true ) ) . "</pre>";
+        }
         $report .= "<hr>";
         $report .= "<p><strong>" . esc_html__( 'Проверено записей:', 'content-cleaner' ) . "</strong> {$checked_count}</p>";
         $report .= "<p><strong>" . esc_html__( 'Переведено в черновики:', 'content-cleaner' ) . "</strong> <b>{$count}</b></p>";
@@ -194,7 +224,7 @@ class Content_Cleaner_Stopwords {
     }
 
     public function render_page() {
-        $current_location = get_option( 'content_cleaner_location', 'title' );
+        $current_location_title = get_option( 'content_cleaner_location_title', 'title' );
         ?>
         <div class="wrap">
             <h1><?php esc_html_e( 'Настройки плагина Content Cleaner', 'content-cleaner' ); ?></h1>
@@ -203,33 +233,40 @@ class Content_Cleaner_Stopwords {
                 <?php settings_fields( 'content_cleaner_group' ); ?>
                 <?php do_settings_sections( 'content_cleaner_group' ); ?>
                 
+                <h2><?php esc_html_e( 'Стоп-слова для заголовка', 'content-cleaner' ); ?></h2>
                 <table class="form-table">
                     <tr valign="top">
                         <th scope="row"><?php esc_html_e( 'Список стоп-слов', 'content-cleaner' ); ?></th>
                         <td>
-                            <textarea name="content_cleaner_list" rows="10" cols="50" class="large-text code" placeholder="нейросеть&#10;языковая модель&#10;chatgpt"><?php echo esc_textarea( get_option( 'content_cleaner_list' ) ); ?></textarea>
+                            <textarea name="content_cleaner_list_title" rows="10" cols="50" class="large-text code" placeholder="нейросеть&#10;языковая модель&#10;chatgpt"><?php echo esc_textarea( get_option( 'content_cleaner_list_title' ) ); ?></textarea>
                             <p class="description"><?php esc_html_e( 'Каждое слово или фраза с новой строки. Фразы с пробелами работают.', 'content-cleaner' ); ?></p>
                         </td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row"><?php esc_html_e( 'Где искать стоп-слова', 'content-cleaner' ); ?></th>
+                        <th scope="row"><?php esc_html_e( 'Где искать стоп-слова для заголовка', 'content-cleaner' ); ?></th>
                         <td>
                             <fieldset>
                                 <label>
-                                    <input type="radio" name="content_cleaner_location" value="title" <?php checked( $current_location, 'title' ); ?>>
+                                    <input type="radio" name="content_cleaner_location_title" value="title" <?php checked( $current_location_title, 'title' ); ?>>
                                     <strong><?php esc_html_e( 'Только в заголовке', 'content-cleaner' ); ?></strong> <em>(<?php esc_html_e( 'по умолчанию', 'content-cleaner' ); ?>)</em>
                                 </label>
                                 <br>
                                 <label>
-                                    <input type="radio" name="content_cleaner_location" value="content" <?php checked( $current_location, 'content' ); ?>>
-                                    <?php esc_html_e( 'Только в тексте записи', 'content-cleaner' ); ?>
-                                </label>
-                                <br>
-                                <label>
-                                    <input type="radio" name="content_cleaner_location" value="both" <?php checked( $current_location, 'both' ); ?>>
+                                    <input type="radio" name="content_cleaner_location_title" value="both" <?php checked( $current_location_title, 'both' ); ?>>
                                     <?php esc_html_e( 'В заголовке и в тексте', 'content-cleaner' ); ?>
                                 </label>
                             </fieldset>
+                        </td>
+                    </tr>
+                </table>
+
+                <h2 style="margin-top: 40px;"><?php esc_html_e( 'Стоп-слова для текста', 'content-cleaner' ); ?></h2>
+                <table class="form-table">
+                    <tr valign="top">
+                        <th scope="row"><?php esc_html_e( 'Список стоп-слов', 'content-cleaner' ); ?></th>
+                        <td>
+                            <textarea name="content_cleaner_list_content" rows="10" cols="50" class="large-text code" placeholder="реклама&#10;спонсорский пост&#10;партнерская ссылка"><?php echo esc_textarea( get_option( 'content_cleaner_list_content' ) ); ?></textarea>
+                            <p class="description"><?php esc_html_e( 'Каждое слово или фраза с новой строки. Фразы с пробелами работают. Эти слова ищутся только в тексте записи.', 'content-cleaner' ); ?></p>
                         </td>
                     </tr>
                 </table>
