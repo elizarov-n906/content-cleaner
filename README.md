@@ -20,7 +20,7 @@
 
 ---
 
- <img src="assets/stopword-trash.jpg" alt="Content Cleaner — автоматический перенос записей в черновики по стоп-словам" width="100%" style="max-width: 100%;">
+ <img src="assets/stopword.jpg" alt="Content Cleaner — автоматический перенос записей в черновики по стоп-словам" width="100%" style="max-width: 100%;">
 
 ## О плагине
 
